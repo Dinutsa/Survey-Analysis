@@ -1,0 +1,11 @@
+pandas
+plotly
+openpyxl
+xlsxwriter
+numpy
+streamlit
+git+https://github.com/py-pdf/fpdf2.git@master
+matplotlib
+requests
+python-docx
+python-pptx

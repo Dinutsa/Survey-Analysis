@@ -1,0 +1,175 @@
+import io
+import textwrap
+import pandas as pd  
+import matplotlib
+matplotlib.use('Agg') 
+import matplotlib.pyplot as plt
+
+from pptx import Presentation
+from pptx.util import Inches, Pt
+from pptx.enum.text import PP_ALIGN
+from pptx.dml.color import RGBColor
+from pptx.oxml.xmlchemy import OxmlElement
+from pptx.oxml.ns import qn
+
+from classification import QuestionInfo, QuestionType
+from summary import QuestionSummary
+from typing import List
+from lang import LANGUAGES
+
+CHART_DPI = 150
+FONT_SIZE_CHART = 11        
+FONT_SIZE_HEADER = 12 
+FONT_SIZE_DATA = 11   
+BAR_WIDTH = 0.6
+
+def set_table_grid_style(table):
+    tbl = table._tbl
+    tblPr = tbl.tblPr
+    tblStyle = tblPr.find(qn('a:tableStyleId'))
+    if tblStyle is None:
+        tblStyle = OxmlElement('a:tableStyleId')
+        tblPr.append(tblStyle)
+    tblStyle.text = '{5940675A-B579-460E-94D1-54222C63F5DA}'
+
+def create_chart_image(qs: QuestionSummary, selected_lang="UA") -> io.BytesIO:
+    lang_dict = LANGUAGES[selected_lang]
+
+    col_variant = qs.table.columns[0]
+    col_count = qs.table.columns[1]
+
+    plt.close('all') 
+    plt.clf()
+    plt.rcParams.update({'font.size': FONT_SIZE_CHART})
+    
+    labels = qs.table[col_variant].astype(str).tolist()
+    
+    values = pd.to_numeric(qs.table[col_count], errors='coerce').fillna(0)
+    if values.sum() == 0:
+        return None
+    
+    wrapped_labels = [textwrap.fill(l, 25) for l in labels]
+
+    is_scale = (qs.question.qtype == QuestionType.SCALE)
+    if not is_scale:
+        try:
+            vals = pd.to_numeric(qs.table[col_variant], errors='coerce')
+            if vals.notna().all() and vals.min() >= 0 and vals.max() <= 10:
+                is_scale = True
+        except: pass
+
+    if is_scale:
+        fig = plt.figure(figsize=(6.0, 4.5))
+        bars = plt.bar(wrapped_labels, values, color='#4F81BD', width=BAR_WIDTH)
+        plt.ylabel(lang_dict["count"])
+        plt.grid(axis='y', linestyle='--', alpha=0.5)
+        plt.xticks(rotation=0)
+        for bar in bars:
+            height = bar.get_height()
+            plt.text(bar.get_x() + bar.get_width()/2., height + 0.1,
+                     f'{int(height)}', ha='center', va='bottom', fontweight='bold')
+    else:
+        fig = plt.figure(figsize=(6.0, 5.0))
+        colors = ['#4F81BD', '#C0504D', '#9BBB59', '#8064A2', '#4BACC6', '#F79646']
+        c_arg = colors[:len(values)] if len(values) <= len(colors) else None
+        
+        wedges, texts, autotexts = plt.pie(
+            values, labels=None, autopct='%1.1f%%', startangle=90,
+            pctdistance=0.8, colors=c_arg, radius=1.1,
+            textprops={'fontsize': FONT_SIZE_CHART}
+        )
+        for autotext in autotexts:
+            autotext.set_color('white')
+            autotext.set_weight('bold')
+            import matplotlib.patheffects as path_effects
+            autotext.set_path_effects([path_effects.withStroke(linewidth=2, foreground='#333333')])
+
+        plt.axis('equal')
+        cols = 2 if len(labels) > 2 else 1
+        plt.legend(wrapped_labels, loc="upper center", bbox_to_anchor=(0.5, 0.0), ncol=cols, frameon=False, fontsize=10)
+
+    plt.tight_layout()
+    img_stream = io.BytesIO()
+    plt.savefig(img_stream, format='png', dpi=CHART_DPI, bbox_inches='tight')
+    plt.close(fig) 
+    img_stream.seek(0)
+    return img_stream
+
+def build_pptx_report(original_df, sliced_df, summaries, range_info, selected_lang="UA") -> bytes:
+    prs = Presentation()
+    lang = LANGUAGES[selected_lang]
+
+    # Слайд 1: Титул
+    slide = prs.slides.add_slide(prs.slide_layouts[0])
+    try:
+        slide.shapes.title.text = lang["report_title"]
+        slide.placeholders[1].text = f"{lang['total_surveys']}: {len(original_df)}\n{lang['processed_surveys']}: {len(sliced_df)}\n{lang['range']}: {range_info}"
+    except: pass
+
+    # Слайди даних
+    layout_index = 5 
+    if len(prs.slide_layouts) <= 5: layout_index = len(prs.slide_layouts) - 1
+    
+    for qs in summaries:
+        if qs.table.empty: continue
+        
+        slide = prs.slides.add_slide(prs.slide_layouts[layout_index])
+        
+        try:
+            title = slide.shapes.title
+            title.text = f"{qs.question.code}. {qs.question.text}"
+            if len(title.text) > 60: title.text_frame.paragraphs[0].font.size = Pt(24)
+            else: title.text_frame.paragraphs[0].font.size = Pt(32)
+        except: pass
+
+        # Таблиця
+        rows = len(qs.table) + 1
+        cols = 3
+        table = slide.shapes.add_table(rows, cols, Inches(0.5), Inches(2.0), Inches(4.5), Inches(0.8)).table
+        set_table_grid_style(table)
+
+        table.columns[0].width = Inches(2.5)
+        table.columns[1].width = Inches(1.0)
+        table.columns[2].width = Inches(1.0)
+
+        # Header
+        headers = [lang["option"], lang["count"], "%"]
+        for i, h in enumerate(headers):
+            cell = table.cell(0, i)
+            cell.text = h
+            cell.text_frame.paragraphs[0].font.bold = True
+            cell.text_frame.paragraphs[0].font.size = Pt(FONT_SIZE_HEADER)
+            cell.text_frame.paragraphs[0].alignment = PP_ALIGN.CENTER
+            cell.fill.solid()
+            cell.fill.fore_color.rgb = RGBColor(220, 220, 220)
+            cell.text_frame.paragraphs[0].font.color.rgb = RGBColor(0, 0, 0)
+
+        # Data
+        for i, row in enumerate(qs.table.itertuples(index=False)):
+            for j, val in enumerate(row):
+                cell = table.cell(i+1, j)
+                cell.text = str(val)
+                cell.text_frame.paragraphs[0].font.size = Pt(FONT_SIZE_DATA)
+                cell.text_frame.paragraphs[0].font.color.rgb = RGBColor(0, 0, 0)
+                if j > 0: cell.text_frame.paragraphs[0].alignment = PP_ALIGN.CENTER
+                else: cell.text_frame.paragraphs[0].alignment = PP_ALIGN.LEFT
+                cell.fill.solid()
+                cell.fill.fore_color.rgb = RGBColor(255, 255, 255)
+
+        # Chart
+        try:
+            img_stream = create_chart_image(qs, selected_lang)
+            slide.shapes.add_picture(img_stream, Inches(5.2), Inches(2.0), width=Inches(4.6))
+        except Exception as e:
+            print(f"Error creating chart for question {qs.question.code}: {e}")
+
+    slide = prs.slides.add_slide(prs.slide_layouts[0])
+    try:
+        slide.shapes.title.text = lang['thank_you']
+        slide.placeholders[1].text = f"{lang['report_footer']}\n{lang['report_footer2']}"
+
+    except: pass
+
+    output = io.BytesIO()
+    prs.save(output)
+    return output.getvalue()
