@@ -5,19 +5,13 @@ import streamlit as st
 import plotly.express as px
 import pandas as pd
 import matplotlib.pyplot as plt
-
 import streamlit.components.v1 as components
 
 st.write(f'<script>console.log("GTM TEST");</script>', unsafe_allow_html=True)
-# Імпорти
+
 from data_loader import load_excels, get_row_bounds, slice_range
 from classification import classify_questions, QuestionType
 from summary import build_all_summaries
-
-from excel_export import build_excel_report
-from pdf_export import build_pdf_report
-from docx_export import build_docx_report
-from pptx_export import build_pptx_report
 from lang import LANGUAGES
 
 # Initialize session state variables
@@ -113,26 +107,6 @@ def get_label(code, summary_map, selected_lang="UA"):
     if len(text) > 90: text = text[:90] + "..."
     return f"{code}. {text}"
 
-# def get_chart_fig(qs, df_data=None, title=None):
-    data = df_data if df_data is not None else qs.table
-    if data.empty: return None
-    is_scale = (qs.question.qtype == QuestionType.SCALE)
-    if not is_scale:
-        try:
-            vals = pd.to_numeric(data[""], errors='coerce')
-            if vals.notna().all() and vals.min() >= 0 and vals.max() <= 10:
-                is_scale = True
-        except: pass
-
-    if is_scale:
-        fig = px.bar(data, x=lang["variant"], y=lang["count"], text=lang["count"], title=title)
-        fig.update_traces(textposition='outside')
-        fig.update_layout(xaxis_type='category')
-    else:
-        fig = px.pie(data, names=lang["variant"], values=lang["count"], hole=0, title=title)
-        fig.update_traces(textinfo='percent+label')
-    return fig
-#
 
 def get_chart_fig(qs, df_data=None, title=None, selected_lang="UA"):
     lang = LANGUAGES[selected_lang]
@@ -283,6 +257,11 @@ if st.session_state.processed and st.session_state.sliced is not None:
 
     # === Tab 2: Export ===
     with t2:
+        from excel_export import build_excel_report
+        from pdf_export import build_pdf_report
+        from docx_export import build_docx_report
+        from pptx_export import build_pptx_report
+
         st.subheader(lang["export_reports"])
         range_info = f"{lang['rows']} {st.session_state.from_row}–{st.session_state.to_row}"
 
