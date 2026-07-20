@@ -38,14 +38,37 @@ with st.sidebar:
 
     demo_file_path = "demo_en_surveys.xlsx"
     if os.path.exists(demo_file_path):
-        with open(demo_file_path, "rb") as f:
-            st.download_button(
+        col_d1, col_d2 = st.columns(2)
+        with col_d1:
+            with open(demo_file_path, "rb") as f:
+             st.download_button(
                 label=lang["download_demo_btn"] + " 📄",
                 data=f,
                 file_name="survey_analytics_demo_en.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 use_container_width=True
             )
+        
+        with col_d2:
+            if st.button("⚡ Quick Demo", type="primary", use_container_width=True):
+                try:
+                    ld = load_excels([demo_file_path])
+                    st.session_state.ld = ld
+
+                    min_r, max_r = get_row_bounds(ld)
+                    st.session_state.from_row = min_r
+                    st.session_state.to_row = max_r
+                    
+                    sliced = slice_range(ld, min_r, max_r)
+                    st.session_state.sliced = sliced
+                    st.session_state.qinfo = classify_questions(sliced)
+                    st.session_state.summaries = build_all_summaries(sliced, st.session_state.qinfo)
+                    st.session_state.processed = True
+                    
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"{lang['error']}: {e}")
+
 
     uploaded_files = st.file_uploader("Excel-files (.xlsx)", type=["xlsx"], accept_multiple_files=True)
 
