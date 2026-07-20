@@ -50,7 +50,7 @@ with st.sidebar:
             )
         
         with col_d2:
-            if st.button("⚡ Quick Demo", type="primary", use_container_width=True):
+            if st.button(lang["demo_btn"], type="primary", use_container_width=True):
                 try:
                     ld = load_excels([demo_file_path])
                     st.session_state.ld = ld
