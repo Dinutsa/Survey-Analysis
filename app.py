@@ -349,9 +349,8 @@ if st.session_state.processed and st.session_state.sliced is not None:
 elif not st.session_state.ld:
     st.info(lang["load_file_left"])
 
-st.markdown("<br><br>", unsafe_allow_html=True) # Відступ
-st.markdown("---") # Лінія
-
+st.markdown("<br><br>", unsafe_allow_html=True) 
+st.markdown("---")
 footer_html = f"""
 <div style='text-align: center; color: #6c757d; font-size: 14px;'>
     <p>
