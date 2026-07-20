@@ -2,7 +2,7 @@
 
 **Survey Analysis Tool** is a web application for automated analysis and report generation based on Google Forms survey results. The app allows you to upload a "raw" Excel file, filter data, and instantly get professionally formatted reports in **PDF**, **Word** (.docx), **PowerPoint** (.pptx) та **Excel**.
 
-Look for more in a Survey_Analysis_Case.pdf
+Look for more in a **Survey_Analysis_Case.pdf**
 
 ![Python](https://img.shields.io/badge/Python-3.9%2B-blue)
 ![Streamlit](https://img.shields.io/badge/Framework-Streamlit-red)
