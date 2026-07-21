@@ -1,0 +1,15 @@
+name: Keep Streamlit App Alive
+
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch: # Дозволяє запуск вручну
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Streamlit App
+        run: |
+          curl -s https://social-analysis-chnu25.streamlit.app > /dev/null
+          echo "Ping successful!"
